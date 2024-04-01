@@ -8,6 +8,7 @@ C Socket Server
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 
 int main(int argc, char** argv)
 {
@@ -18,23 +19,33 @@ int main(int argc, char** argv)
     int listenResult;
     int yes = 1;
 
-    struct sockaddr_in address;
+    struct addrinfo hints, *res;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    getaddrinfo(NULL, "1234", &hints, &res);
+
+    // struct sockaddr_in address;
     struct sockaddr_in clientAddress;
     int addrSize = sizeof(struct sockaddr_storage);
     // int serverSocket2;
     
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_family = AF_INET;
-    address.sin_port = htons(1234);
+    // address.sin_addr.s_addr = INADDR_ANY;
+    // address.sin_family = AF_INET;
+    // address.sin_port = htons(1234);
 
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    // serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    serverSocket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
     printf("The socket number is: %d\n", serverSocket);
 
     setSockOptResult = setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
     printf("setSockOptResult: %d\n", setSockOptResult);
 
-    bindResult = bind(serverSocket, (struct sockaddr *)&address, sizeof(address));
+    // bindResult = bind(serverSocket, (struct sockaddr *)&address, sizeof(address));
+    bindResult = bind(serverSocket, res->ai_addr, res->ai_addrlen);
     printf("bindResult: %d\n", bindResult);
 
     listenResult = listen(serverSocket, 5);
@@ -51,6 +62,17 @@ int main(int argc, char** argv)
         recvSize = recv(clientSocket, buffer, 1024, 0);
         printf("Received size: %ld\n", recvSize);
         printf("Received from client: %s\n", buffer);
+
+        //if buffer == "quit" then close connection and accept
+        if(strncmp(buffer, "quit", 4) == 0)
+        {
+            int sendSize;
+            memset(buffer, 0, recvSize);
+            printf("Closing client connection\n");
+            sendSize = sprintf(buffer, "quit");
+            send(clientSocket, buffer, sendSize, 0);
+            break;
+        }
 
         ssize_t sendSize;
         sendSize = send(clientSocket, buffer, recvSize, 0);
