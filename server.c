@@ -9,6 +9,7 @@ C Socket Server
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <fcntl.h>
 
 int main(int argc, char** argv)
 {
@@ -18,6 +19,10 @@ int main(int argc, char** argv)
     int bindResult;
     int listenResult;
     int yes = 1;
+    FILE *file;
+    char* fileBuffer;
+    size_t fileSize;
+    size_t fileReadSize;
 
     struct addrinfo hints, *res;
 
@@ -51,33 +56,60 @@ int main(int argc, char** argv)
     listenResult = listen(serverSocket, 5);
     printf("listenResult: %d\n", listenResult);
 
+    file = fopen("server.out", "rb");
+    fseek(file, 0, SEEK_END);
+    fileSize = ftell(file);
+    rewind(file);
+
+    printf("The file size is: %ld\n", fileSize);
+    fileBuffer = (char *) malloc(fileSize * sizeof(char));
+    fileReadSize = fread(fileBuffer, sizeof(char), fileSize, file);
+    printf("Read in %ld bytes to fileBuffer\n", fileReadSize);
+    // return 0;
+
     clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddress, (socklen_t *)&addrSize);
     printf("clientSocket: %d\n", clientSocket);
 
     char buffer[1024] = {0};
     while(1)
     {
-        
-        ssize_t recvSize;
-        recvSize = recv(clientSocket, buffer, 1024, 0);
-        printf("Received size: %ld\n", recvSize);
-        printf("Received from client: %s\n", buffer);
-
-        //if buffer == "quit" then close connection and accept
-        if(strncmp(buffer, "quit", 4) == 0)
-        {
-            int sendSize;
-            memset(buffer, 0, recvSize);
-            printf("Closing client connection\n");
-            sendSize = sprintf(buffer, "quit");
-            send(clientSocket, buffer, sendSize, 0);
-            break;
-        }
-
         ssize_t sendSize;
-        sendSize = send(clientSocket, buffer, recvSize, 0);
+        ssize_t recvSize;
+        sprintf(buffer, "%ld", fileSize);
+        sendSize = send(clientSocket, buffer, strlen(buffer), 0);
 
-        memset(buffer, 0, 1024);
+        memset(buffer, 0, sendSize);
+        recvSize = recv(clientSocket, buffer, 1024, 0);
+        memset(buffer, 0, recvSize);
+        sendSize = send(clientSocket, fileBuffer, fileSize, 0);
+        recvSize = recv(clientSocket, buffer, 1024, 0);
+        printf("Received from client: %s\n", buffer);
+        break;
+        
+        // printf("DEBUG: %s\n", buffer);
+        // return 0;
+
+
+        // ssize_t recvSize;
+        // recvSize = recv(clientSocket, buffer, 1024, 0);
+        // printf("Received size: %ld\n", recvSize);
+        // printf("Received from client: %s\n", buffer);
+
+        // //if buffer == "quit" then close connection and accept
+        // if(strncmp(buffer, "quit", 4) == 0)
+        // {
+        //     int sendSize;
+        //     memset(buffer, 0, recvSize);
+        //     printf("Closing client connection\n");
+        //     sendSize = sprintf(buffer, "quit");
+        //     send(clientSocket, buffer, sendSize, 0);
+        //     break;
+        // }
+
+        // ssize_t sendSize;
+        // sendSize = send(clientSocket, buffer, recvSize, 0);
+
+        // memset(buffer, 0, 1024);
     }
     
 
@@ -91,6 +123,7 @@ int main(int argc, char** argv)
     // {
         
     // }
+    fclose(file);
     close(serverSocket);
     
     return 0;
